@@ -1,0 +1,5 @@
+[22/09/2020] Will create a GUI based on the following site: https://realpython.com/pysimplegui-python/
+ - I developed the virst version of the segmentation GUI in the script "script_segemt_tool.py"
+ TASK_TO_DO: 
+    - read pixels from image
+    - resize images to fite in a screen
