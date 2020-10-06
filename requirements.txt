@@ -1,2 +1,5 @@
 opencv-python
 pysimplegui
+pynput
+mpld3
+wxPython==4.1.0
