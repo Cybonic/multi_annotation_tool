@@ -30,26 +30,67 @@ IMG_HIGH = 480
 IMG_WIDTH = 720
 
 IMG_DOWN_SCALE_PERCENT = 40
+
+class bounding_box:
+    def __init__(self):
+        self.upper_left_corner = (0,0)
+        self.bottom_right_corner = (0,0)
+        # self.finished_bb_flag = 0
+        self.first_bb_flag = False
+        self.h = 0
+        self.w = 0
+        self.label = ''
+
+    def set_first_corner(self,x,y):
+        self.upper_left_corner = (x,y)
+        self.first_bb_flag = True
+
+    def set_last_corner(self,x,y):
+        self.bottom_right_corner = (x,y)
+        # self.finished_bb_flag = True
+        
+    def comp_bbox(self):
+        '''
+        Compute bounding box parameters after obtaining upper and bottom corners
+
+        '''
+        self.h = abs(self.upper_left_corner[1]- self.bottom_right_corner[1])
+        self.w = abs(self.upper_left_corner[0]- self.bottom_right_corner[0])
+
+        # compute bounding box origin (center of bounding box)
+        self.y_orig = int(self.upper_left_corner[1] - self.h/2)
+        self.x_orig = int(self.upper_left_corner[0] + self.w/2)
+
+        self.first_bb_flag = False
+
+        print("h: " +str(self.h) + " w: " + str(self.w))
+        print("x: " + str(self.x_orig) + " y: " + str(self.y_orig))
+
+        return(self.x_orig,self.y_orig,self.w,self.h)
+
+    def set_label(self,label):
+        self.label = label
+    
 class segment_gui:
     def __init__(self,window,img_hight,img_width,img_down_scale):
         self._window = window
         self._image_handler = imgh.image_handler(img_hight,img_width,img_down_scale)
 
+        self._bb_tool = bounding_box()
+        self._bbox_tool_flag =True
+        self._segment_tool_flag = False
+
         canvas_elem = window['-IMAGE-']
-        canvas = canvas_elem.Widget
-        canvas.bind('<Motion>',self.on_move)
-        canvas.bind('<Button-1>',self.left_click_segment)
+        self.canvas = canvas_elem.Widget
+        
+        self.canvas.bind('<Button-1>',self.left_click_bb)
         self._kernel_value = 2
 
-    def left_click_segment(self,event):
-        # 
-        x,y = event.x,event.y
-        self.right_click_pose = (event.x,event.y)
-        #self.event_generate('<Button-3>', x=event.x, y=event.y)
-        #return 'break'
+    def plot_pointer_kernel(self,x,y,point_size):
+
         img = self._image_handler.get_curr_img()
 
-        kernel_x,kernel_y = imgh.get_kernel(self._kernel_value)
+        kernel_x,kernel_y = imgh.get_kernel(point_size)
 
         kernel_x_idx = kernel_x + x
         kernel_y_idx = kernel_y + y
@@ -59,8 +100,37 @@ class segment_gui:
         img[ kernel_y_idx,kernel_x_idx, 2] = 0
  
         imgbytes = imgh.conv_to_bytes(img)
-      
+
         self._window["-IMAGE-"].update(data=imgbytes)
+
+    def left_click_bb(self,event):
+        
+        x,y = event.x,event.y
+        
+        if self._bb_tool.first_bb_flag == False:
+            self._bb_tool.set_first_corner(x,y)
+        else:
+            self._bb_tool.set_last_corner(x,y)
+            x_org,y_org,w,h = self._bb_tool.comp_bbox()
+            x_pixels,y_pixels = imgh.generate_bbox_pixels(x_org,y_org,w,h)
+            
+            img = self._image_handler.get_curr_img()
+            img[y_pixels,x_pixels, 0] = 255
+            img[ y_pixels,x_pixels, 1] = 0
+            img[ y_pixels,x_pixels, 2] = 0
+ 
+            imgbytes = imgh.conv_to_bytes(img)
+
+            self._window["-IMAGE-"].update(data=imgbytes)
+
+        self.plot_pointer_kernel(x,y,2)
+
+    def left_click_segment(self,event):
+
+        x,y = event.x,event.y
+        self.right_click_pose = (event.x,event.y)
+
+        self.plot_pointer_kernel(x,y,2)
 
     def load_kernel_value(self,value):
         self._kernel_value = value
@@ -148,12 +218,28 @@ class segment_gui:
                 # PREVIOUS button was pressed: show the previous image again
                 imgbytes = self._image_handler.get_prev_img()
                 self._window["-IMAGE-"].update(data=imgbytes)
+            
+            elif event == "-RADIO1-": 
+            # Selection bounding box tool
+                self._bbox_tool_flag = True
+                self._segment_tool_flag = False
+                self.canvas.bind('<B1-Motion>',self.left_click_segment)
+
+            elif event == "-RADIO2-":
+            # Selection of segmentation tool
+                self._bbox_tool_flag = False
+                self._segment_tool_flag = True
+                self.canvas.bind('<Button-1>',self.left_click_bb)
+
         
         self._window.close()
 
 # First the window layout in 2 columns
 
 file_list_column = [
+    [
+        sg.Radio('Bounding Box',"-RADIO1-", default=True), sg.Radio('Segmentation',"-RADIO2-")
+    ],
     [
         sg.Text("Kernel"),
         sg.In(size=(9, 1), enable_events=True, key="-KERNEL-"),
