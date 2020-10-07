@@ -31,37 +31,65 @@ IMG_WIDTH = 720
 
 IMG_DOWN_SCALE_PERCENT = 40
 
+class bbox_object:
+    def __init__(self,x,y,w,h,label):
+        self._x = x
+        self._y = y
+        self._label = label
+        self._w = w
+        self._h = h
+    
+    def conv_to_str(self):
+
+        str_bb = self._label + " " + str(self._x) + " " +  str(self._y) + " " + str(self._y) + " " + str(self._h) + " " + str(self._w)
+        return(str_bb)
+                  
+                  
+                  
+                  
+
+
 class bounding_box:
     def __init__(self):
         self.upper_left_corner = (0,0)
         self.bottom_right_corner = (0,0)
         # self.finished_bb_flag = 0
-        self.first_bb_flag = False
+        #self.first_bb_flag = False
         self.h = 0
         self.w = 0
         self.label = ''
 
     def set_first_corner(self,x,y):
         self.upper_left_corner = (x,y)
-        self.first_bb_flag = True
+        
 
     def set_last_corner(self,x,y):
         self.bottom_right_corner = (x,y)
-        # self.finished_bb_flag = True
+        #self.first_bb_flag = False
         
-    def comp_bbox(self):
+    def comp_bbox(self,ci,cf):
         '''
         Compute bounding box parameters after obtaining upper and bottom corners
 
         '''
-        self.h = abs(self.upper_left_corner[1]- self.bottom_right_corner[1])
-        self.w = abs(self.upper_left_corner[0]- self.bottom_right_corner[0])
+        xi,yi = ci
+        xf,yf = cf
 
-        # compute bounding box origin (center of bounding box)
-        self.y_orig = int(self.upper_left_corner[1] - self.h/2)
-        self.x_orig = int(self.upper_left_corner[0] + self.w/2)
+        self.h = yf - yi
+        self.w = xf - xi
 
-        self.first_bb_flag = False
+        self.h_dirct = np.sign(self.h)
+        self.w_dirct = np.sign(self.w)
+
+        if self.w == 0:
+            self.w +=1
+        if self.h == 0:
+            self.h +=1
+
+        self.y_orig = int(yi + self.h/2)
+        self.x_orig = int(xi + self.w/2)
+
+        # self.first_bb_flag = False
 
         print("h: " +str(self.h) + " w: " + str(self.w))
         print("x: " + str(self.x_orig) + " y: " + str(self.y_orig))
@@ -72,58 +100,110 @@ class bounding_box:
         self.label = label
     
 class segment_gui:
-    def __init__(self,window,img_hight,img_width,img_down_scale):
+    def __init__(self,window,img_hight,img_width,img_down_scale,destin_path):
         self._window = window
         self._image_handler = imgh.image_handler(img_hight,img_width,img_down_scale)
 
         self._bb_tool = bounding_box()
         self._bbox_tool_flag =True
         self._segment_tool_flag = False
+        self.first_bb_flag = False
 
         canvas_elem = window['-IMAGE-']
         self.canvas = canvas_elem.Widget
         
-        self.canvas.bind('<Button-1>',self.left_click_bb)
+        self.canvas.bind('<B1-Motion>',self.left_click_bb)
         self._kernel_value = 2
+        self.pixel_idx_to_plot = [[],[]] 
+        self.one_frame_pixels_idx = [[],[]]
+        self.bbox_list = []
+        self.selectedlabel = []
+        self.add_to_temp_bbox_bag([])
+        self.label_list = []
 
-    def plot_pointer_kernel(self,x,y,point_size):
+        root = os.getcwd()
+        self.segment_path = os.path.join(root,destin_path,'segment_labels')
+        self.bb_path = os.path.join(root,destin_path,'bbox_labels')
+        try:
+            os.makedirs(self.segment_path)
+        except OSError:
+            print ("Creation of the directory %s failed" % self.segment_path)
+        else:
+            print ("Successfully created the directory %s " % self.segment_path)
 
-        img = self._image_handler.get_curr_img()
+        try:
+            os.makedirs(self.bb_path)
+        except OSError:
+            print ("Creation of the directory %s failed" % self.bb_path)
+        else:
+            print ("Successfully created the directory %s " % self.bb_path)
+
+
+    def pointer_pixels(self,x,y,point_size):
+
+        #img = self._image_handler.get_curr_img()
 
         kernel_x,kernel_y = imgh.get_kernel(point_size)
 
         kernel_x_idx = kernel_x + x
         kernel_y_idx = kernel_y + y
-       
-        img[kernel_y_idx,kernel_x_idx, 0] = 255
-        img[ kernel_y_idx,kernel_x_idx, 1] = 0
-        img[ kernel_y_idx,kernel_x_idx, 2] = 0
+        return(kernel_x_idx,kernel_y_idx)
+        #img[ kernel_y_idx,kernel_x_idx, 0] = 255
+        #img[ kernel_y_idx,kernel_x_idx, 1] = 0
+        #img[ kernel_y_idx,kernel_x_idx, 2] = 0
  
-        imgbytes = imgh.conv_to_bytes(img)
+        #imgbytes = imgh.conv_to_bytes(img)
 
-        self._window["-IMAGE-"].update(data=imgbytes)
+        #self._window["-IMAGE-"].update(data=imgbytes)
 
-    def left_click_bb(self,event):
+
         
+    def left_click_bb(self,event):
+        '''
+        Define first bounding box corner
+        
+        '''
         x,y = event.x,event.y
 
-        if self._bb_tool.first_bb_flag == False:
+        if self.first_bb_flag == False:
+            self.first_bb_flag = True
             self._bb_tool.set_first_corner(x,y)
-        else:
-            self._bb_tool.set_last_corner(x,y)
-            x_org,y_org,w,h = self._bb_tool.comp_bbox()
-            x_pixels,y_pixels = imgh.generate_bbox_pixels(x_org,y_org,w,h)
-            
-            img = self._image_handler.get_curr_img()
-            img[y_pixels,x_pixels, 0] = 255
-            img[ y_pixels,x_pixels, 1] = 0
-            img[ y_pixels,x_pixels, 2] = 0
- 
-            imgbytes = imgh.conv_to_bytes(img)
+            self.pi = (x,y)
+            self.plot_pointer_kernel(x,y,2)
+            return
 
-            self._window["-IMAGE-"].update(data=imgbytes)
+        pf = (x,y)
 
-        self.plot_pointer_kernel(x,y,2)
+        x_org,y_org,w,h = self._bb_tool.comp_bbox(self.pi,pf)
+        x_pixels,y_pixels = imgh.generate_bbox_pixels(x_org,y_org,w,h)
+        
+        self.add_pixels_to_temp_bag(x_pixels,y_pixels)
+
+        xp,yp = np.array(self.pixel_idx_to_plot,dtype = int)
+
+        ypixels = np.concatenate((y_pixels,yp))
+        xpixels = np.concatenate((x_pixels,xp))
+
+        bbox = bbox_object(x_org,y_org,w,h,[])
+        self.add_to_temp_bbox_bag(bbox)
+
+        self.plot_canvas(xpixels,ypixels)
+    
+    def reset_bbox_settings(self):
+        self.first_bb_flag = False
+        self.select_bbox = []
+        self.clear_temp_pixel_bag()
+
+    def get_pixels(self):
+        if np.array(self.pixel_idx_to_plot).size > 0:
+            xp,yp = np.array(self.pixel_idx_to_plot,dtype = int)
+            return(xp,yp)
+        else: 
+            return([],[])
+
+    def get_temp_pixels(self):
+        xp,yp = np.array(self.one_frame_pixels_idx,dtype = int)
+        return(xp[0],yp[0])
 
     def left_click_segment(self,event):
 
@@ -132,15 +212,72 @@ class segment_gui:
         kernel_size = int(self._window["-SLIDER-"].TKScale.get())
         self.load_kernel_value(kernel_size)
 
-        self.plot_pointer_kernel(x,y,kernel_size)
+        x_pixels,y_pixels = self.pointer_pixels(x,y,kernel_size)
+        self.add_pixels_to_temp_bag(x_pixels,y_pixels)
+        
+        # self.plot_pointer_kernel(x,y,kernel_size)
+        self.plot_canvas(x_pixels,y_pixels)
+
+    def plot_canvas(self,xp,yp):
+
+        img = self._image_handler.get_curr_img()
+        
+        img[yp,xp, 0] = 255
+        img[yp,xp, 1] = 0
+        img[yp,xp, 2] = 0
+
+        imgbytes = imgh.conv_to_bytes(img)
+
+        self._window["-IMAGE-"].update(data=imgbytes)
+
+    def clear_temp_pixel_bag(self):
+        self.one_frame_pixels_idx = [[],[]]
+
+    def clear_pixel_bag(self):
+        self.pixel_idx_to_plot = [[],[]]
+
+
+    def add_to_pixel_bag(self,xidx,yidx):
+
+        self.pixel_idx_to_plot[0] = np.concatenate((self.pixel_idx_to_plot[0],xidx))
+        self.pixel_idx_to_plot[1] = np.concatenate((self.pixel_idx_to_plot[1],yidx))
+
+    def add_pixels_to_temp_bag(self,xidx,yidx):
+
+        self.one_frame_pixels_idx[0] = xidx.reshape((1,-1))
+        self.one_frame_pixels_idx[1] = yidx.reshape((1,-1))
+
+    def add_to_temp_bbox_bag(self,bbox):
+        self.select_bbox = bbox
+
+    def add_to_bbox_list(self,bbox):
+        self.bbox_list.append(bbox)
+        self.label_list.append(bbox._label)
+        return(self.label_list)
+    
+    def get_bbox_list(self):
+        return(self.bbox_list)
+
+    def save_bbox(self):
+        file_name = self._image_handler.get_curr_file_name()
+        file_path = os.path.join(self.bb_path,file_name+ '.txt')
+
+        f = open(file_path,'w')
+        bbox_list = self.get_bbox_list()
+        for bbox in bbox_list:
+            f.write(bbox.conv_to_str())
+        f.close()
+
+
+
 
     def load_kernel_value(self,value):
         
         self._kernel_value = value
 
+
     def on_move(self,event):
     
-        # cv2.waitKey(1)
         print('Pointer moved to {0}'.format(
             (event.x, event.y)))
 
@@ -148,7 +285,6 @@ class segment_gui:
         if event == cv2.EVENT_MOUSEMOVE and event == cv2.EVENT_LBUTTONDOWN:
             print(x,",",y)
         
-
     def loop(self):
         
         while True:
@@ -171,12 +307,12 @@ class segment_gui:
                     file_list = []
 
                 imagelist = [
-                    os.path.join(folder, f)
+                    f
                     for f in file_list
                     if os.path.isfile(os.path.join(folder, f))
                 ]
 
-                self._image_handler.load_img_list(imagelist)
+                self._image_handler.load_img_list(imagelist,folder)
 
                 imgbytes = self._image_handler.get_next_img()
 
@@ -192,34 +328,37 @@ class segment_gui:
                 except:
                     pass
 
-            elif event == "-FILE LIST-":  # A file was chosen from the listbox
+            elif event == "-FILE LIST-":  
+                # A file was chosen from the listbox
 
-                selectedlabel = values["-FILE LIST-"][0]
+                self.selectedlabel = values["-FILE LIST-"][0]
 
                 try:
-                    self._window["-TOUT-"].update(selectedlabel)
+                    self._window["-TOUT-"].update(self.selectedlabel)
                 except:
                     pass
             
             elif event == "-NEXT-":
                 # NEXT button was pressed: show next image
-
+                self.clear_pixel_bag()
                 imgbytes = self._image_handler.get_next_img() # Get next image (as byte format) in line 
                 self._window["-IMAGE-"].update(data=imgbytes) # Upload image to GUI
             
             elif event == "-PREV-":
+                self.clear_pixel_bag()
                 # PREVIOUS button was pressed: show the previous image again
                 imgbytes = self._image_handler.get_prev_img()
                 self._window["-IMAGE-"].update(data=imgbytes)
             
-            elif event == "-RADIO1-": 
+            elif event == "-RADIO1-":
             # Selection bounding box tool
                 self._window["-RADIO2-"].update(False)
                 self._bbox_tool_flag = True
                 self._segment_tool_flag = False
                 
-                self.canvas.bind('<Button-1>',self.left_click_bb)
-                self.canvas.unbind('<B1-Motion>')
+                self.canvas.bind('<B1-Motion>',self.left_click_bb)
+                self.canvas.bind('<Button-3>',self.right_click_bb)
+                # self.canvas.unbind('<B1-Motion>')
 
             elif event == "-RADIO2-":
             # Selection of segmentation tool
@@ -228,10 +367,34 @@ class segment_gui:
                 self._segment_tool_flag = True
                 self.canvas.unbind("<Button-1>")
                 self.canvas.bind('<B1-Motion>',self.left_click_segment)
+            
+            elif  event == "-SAVE ELEMT-":
                 
+                bbox = self.select_bbox
+
+                label = self.selectedlabel
+
+                if label != []:
+                    bbox._label = label
+                    #self.bbox_list.append(bbox)
+                    label_list = self.add_to_bbox_list(bbox)
+                    self._window["-ELEM LIST-"].update(label_list)
+                    
+                    xp,yp = self.get_temp_pixels()
+                    self.add_to_pixel_bag(xp,yp)
+                    self.reset_bbox_settings()
+            
+            elif  event == "-DEL ELEMT-":
+
+                self.reset_bbox_settings()
+                xp,yp = self.get_pixels()
+                self.plot_canvas(xp,yp)
+            
+            elif event == "-SAVE-":
                 
+                self.save_bbox()
+                # print(file_name)
                 
-        
         self._window.close()
 
 # First the window layout in 2 columns
@@ -255,10 +418,24 @@ file_list_column = [
         sg.Button('Ok',enable_events=True, key="-OK-"),
     ],
     [
-        sg.Listbox(
-            values=[], enable_events=True, size=(20, 10), key="-FILE LIST-"
+        sg.Listbox(values=[], enable_events=True, size=(20, 10), key="-FILE LIST-"
         )
     ],
+    [
+        sg.Button('SAVE Elemt',enable_events=True, key="-SAVE ELEMT-"),
+        sg.Button('DEL',enable_events=True, key="-DEL ELEMT-")
+    ],
+    [
+        sg.Text("Elemtents")
+    ],
+    [
+        sg.Listbox(values=[], enable_events=True, size=(20, 10), key="-ELEM LIST-")
+    ],
+    [
+        sg.Button('SAVE',enable_events=True, key="-SAVE-"),
+        sg.Button('DEL',enable_events=True, key="-DEL-"),
+    ],
+    
 ]
 
 # For now will only show the name of the file that was chosen
@@ -292,7 +469,8 @@ if __name__ == "__main__":
     gui = segment_gui(  window,
                         IMG_HIGH,
                         IMG_WIDTH,
-                        IMG_DOWN_SCALE_PERCENT
+                        IMG_DOWN_SCALE_PERCENT,
+                        'labels'
                         )
 
     gui.loop()
