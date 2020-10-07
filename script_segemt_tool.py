@@ -31,6 +31,24 @@ IMG_WIDTH = 720
 
 IMG_DOWN_SCALE_PERCENT = 40
 
+class bbox_object:
+    def __init__(self,x,y,w,h,label):
+        self._x = x
+        self._y = y
+        self._label = label
+        self._w = w
+        self._h = h
+    
+    def str_bbox(self):
+
+        str_bb = self._label + " " + str(self._x) + " " +  str(self._y) + " " + str(self._y) + " " + str(self._h) + " " + str(self._w)
+        return(str_bb)
+                  
+                  
+                  
+                  
+
+
 class bounding_box:
     def __init__(self):
         self.upper_left_corner = (0,0)
@@ -68,10 +86,6 @@ class bounding_box:
         if self.h == 0:
             self.h +=1
 
-        #self.h = abs(self.upper_left_corner[1]- self.bottom_right_corner[1])
-        #self.w = abs(self.upper_left_corner[0]- self.bottom_right_corner[0])
-
-        # compute bounding box origin (center of bounding box)
         self.y_orig = int(yi + self.h/2)
         self.x_orig = int(xi + self.w/2)
 
@@ -102,7 +116,9 @@ class segment_gui:
         self.canvas.bind('<Button-3>',self.right_click_bb)
         self._kernel_value = 2
         self.pixel_idx_to_plot = [[],[]] 
-        self.one_frame_pixels_idx = [[],[]] 
+        self.one_frame_pixels_idx = [[],[]]
+        self.bbox_list = []
+        self.selectedlabel = []
 
     def plot_pointer_kernel(self,x,y,point_size):
 
@@ -148,6 +164,19 @@ class segment_gui:
         self.add_to_pixel_bag(xpixels,ypixels)
 
         self.plot_canvas(xpixels,ypixels)
+        label = self.selectedlabel
+        
+        if label != []:
+
+            bb = bbox_object(x_org,y_org,w,h,label)
+            self.bbox_list.append(bb)
+            msg = bb.str_bbox()
+
+            labellist = [label]
+
+            self._window["-ELEM LIST-"].update(labellist)
+            self.selectedlabel = []
+           
 
        
 
@@ -273,10 +302,10 @@ class segment_gui:
             elif event == "-FILE LIST-":  
                 # A file was chosen from the listbox
 
-                selectedlabel = values["-FILE LIST-"][0]
+                self.selectedlabel = values["-FILE LIST-"][0]
 
                 try:
-                    self._window["-TOUT-"].update(selectedlabel)
+                    self._window["-TOUT-"].update(self.selectedlabel)
                 except:
                     pass
             
@@ -333,17 +362,14 @@ file_list_column = [
         sg.Button('Ok',enable_events=True, key="-OK-"),
     ],
     [
-        sg.Listbox(
-            values=[], enable_events=True, size=(20, 10), key="-FILE LIST-"
+        sg.Listbox(values=[], enable_events=True, size=(20, 10), key="-FILE LIST-"
         )
     ],
     [
         sg.Text("Elemtents")
     ],
     [
-        sg.Listbox(
-            values=[], enable_events=True, size=(20, 10), key="-ELEM LIST-"
-        )
+        sg.Listbox(values=[], enable_events=True, size=(20, 10), key="-ELEM LIST-")
     ],
     [
         sg.Button('SAVE',enable_events=True, key="-SAVE-"),
