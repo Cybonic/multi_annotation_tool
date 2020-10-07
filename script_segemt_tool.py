@@ -265,7 +265,7 @@ class segment_gui:
         f = open(file_path,'w')
         bbox_list = self.get_bbox_list()
         for bbox in bbox_list:
-            f.write(bbox.conv_to_str())
+            f.write(bbox.conv_to_str() + '\n')
         f.close()
 
 
@@ -357,7 +357,7 @@ class segment_gui:
                 self._segment_tool_flag = False
                 
                 self.canvas.bind('<B1-Motion>',self.left_click_bb)
-                self.canvas.bind('<Button-3>',self.right_click_bb)
+                #self.canvas.bind('<Button-3>',self.right_click_bb)
                 # self.canvas.unbind('<B1-Motion>')
 
             elif event == "-RADIO2-":
