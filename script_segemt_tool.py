@@ -106,7 +106,7 @@ class segment_gui:
     def left_click_bb(self,event):
         
         x,y = event.x,event.y
-        
+
         if self._bb_tool.first_bb_flag == False:
             self._bb_tool.set_first_corner(x,y)
         else:
@@ -129,10 +129,13 @@ class segment_gui:
 
         x,y = event.x,event.y
         self.right_click_pose = (event.x,event.y)
+        kernel_size = int(self._window["-SLIDER-"].TKScale.get())
+        self.load_kernel_value(kernel_size)
 
-        self.plot_pointer_kernel(x,y,2)
+        self.plot_pointer_kernel(x,y,kernel_size)
 
     def load_kernel_value(self,value):
+        
         self._kernel_value = value
 
     def on_move(self,event):
@@ -179,16 +182,6 @@ class segment_gui:
 
                 self._window["-IMAGE-"].update(data=imgbytes)
 
-            elif event == "-KERNELOK-":
-                kernel_value_str = values["-KERNEL-"]
-
-                if kernel_value_str == '':
-                    kernel_value=2
-                else:
-                    kernel_value = int(kernel_value_str)
-
-                self.load_kernel_value(kernel_value)
-
             elif event == "-OK-":
 
                 label_name = values["-LABEL-"]
@@ -221,16 +214,23 @@ class segment_gui:
             
             elif event == "-RADIO1-": 
             # Selection bounding box tool
+                self._window["-RADIO2-"].update(False)
                 self._bbox_tool_flag = True
                 self._segment_tool_flag = False
-                self.canvas.bind('<B1-Motion>',self.left_click_segment)
+                
+                self.canvas.bind('<Button-1>',self.left_click_bb)
+                self.canvas.unbind('<B1-Motion>')
 
             elif event == "-RADIO2-":
             # Selection of segmentation tool
+                self._window["-RADIO1-"].update(False)
                 self._bbox_tool_flag = False
                 self._segment_tool_flag = True
-                self.canvas.bind('<Button-1>',self.left_click_bb)
-
+                self.canvas.unbind("<Button-1>")
+                self.canvas.bind('<B1-Motion>',self.left_click_segment)
+                
+                
+                
         
         self._window.close()
 
@@ -238,12 +238,16 @@ class segment_gui:
 
 file_list_column = [
     [
-        sg.Radio('Bounding Box',"-RADIO1-", default=True), sg.Radio('Segmentation',"-RADIO2-")
+        sg.Radio('Bounding Box', "radio" ,key = "-RADIO1-",enable_events=True,default=True)
+    ],
+    [
+     sg.Radio('Segmentation',"radio",key = "-RADIO2-",enable_events=True)
     ],
     [
         sg.Text("Kernel"),
-        sg.In(size=(9, 1), enable_events=True, key="-KERNEL-"),
-        sg.Button('Ok',enable_events=True, key="-KERNELOK-"),
+        sg.Slider(range=(0,50),default_value=2,size=(12,20),orientation='horizontal',font=('Helvetica', 10),key='-SLIDER-'),
+        #sg.In(size=(9, 1), enable_events=True, key="-KERNEL-"),
+        #sg.Button('Ok',enable_events=True, key="-KERNELOK-"),
     ],
     [
         sg.Text("Label"),
