@@ -11,7 +11,6 @@ class image_handler:
         self._width = target_with
         self._label_list = []
         
-
     def appendLabel(self,labelname):
         self._label_list.append(labelname)
         return(self._label_list)
@@ -57,23 +56,26 @@ class image_handler:
         idx = np.argmin(ratio)
         percent = ratio[idx]*100
 
-        resized = self.img_down_scale(img,percent)
-        imgbytes = cv2.imencode(".png", resized)[1].tobytes()
+        resized_img = self.img_down_scale(img,percent)
+        #imgbytes = cv2.imencode(".png", resized)[1].tobytes()
         
-        self.image_t = resized
-        return(imgbytes)
+        self.image_t = resized_img
+        return(resized_img)
 
     def get_curr_img(self):
-        return(self.image_t)
+        img = self.get_img(self._imgitr)
+        return(img)
 
     def get_next_img(self):
         self._imgitr += 1
-        imgbytes = self.get_img(self._imgitr)
+        img = self.get_img(self._imgitr)
+        imgbytes = conv_to_bytes(img)
         return(imgbytes)
     
     def get_prev_img(self):
         self._imgitr -= 1
-        imgbytes = self.get_img(self._imgitr)
+        img = self.get_img(self._imgitr)
+        imgbytes = conv_to_bytes(img)
         return(imgbytes)
 
 def conv_to_bytes(img):
@@ -105,8 +107,6 @@ def get_kernel(size):
 
 def generate_bbox_pixels(x,y,w,h):
 
-    #w_range = np.array(range(0,w))
-    #h_range = np.array(range(0,h))
 
     xi = int(x - w/2)
     yi = int(y - h/2)
@@ -114,16 +114,16 @@ def generate_bbox_pixels(x,y,w,h):
     xf = int(x + w/2)
     yf = int(y + h/2)
 
-    w_range = np.array(range(0,w))
-    h_range = np.array(range(0,h))
+    w_range = np.sign(w)*np.array(range(0,abs(w)),dtype=int)
+    h_range =  np.sign(h)*np.array(range(0,abs(h)),dtype=int)
 
     y_ver = yi + h_range
     x_hor = xi + w_range
 
-    line_vert_left = (xi*np.ones((len(y_ver)),dtype = int),y_ver)
+    line_vert_left  = (xi*np.ones((len(y_ver)),dtype = int),y_ver)
     line_vert_right = (xf*np.ones((len(y_ver)),dtype = int),y_ver)
     line_hor_buttom = (x_hor,yi*np.ones((len(x_hor)),dtype = int))
-    line_hor_top =    (x_hor,yf*np.ones((len(x_hor)),dtype = int))
+    line_hor_top    = (x_hor,yf*np.ones((len(x_hor)),dtype = int))
 
     x_pixels = np.concatenate((line_vert_left[0],line_vert_right[0],line_hor_buttom[0],line_hor_top[0]))
     y_pixels = np.concatenate((line_vert_left[1],line_vert_right[1],line_hor_buttom[1],line_hor_top[1]))
