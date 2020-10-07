@@ -1,4 +1,5 @@
-06/10/2020 Today a finished the feature to get mouse positions from the image. I also started to split the application in two: segmentation and bounding box
+07/10/2020 Today I finished the first version of the bounding box saving to a file feature
+06/10/2020 Today I finished the feature to get mouse positions from the image. I also started to split the application in two: segmentation and bounding box
    The segmentation part reads mouse positions with a kernel at the mouse pointer. The bounding box part needs the definitions of two corners to form a bounding box.
    Both applications are not finished. Namely the bounding box part just defines bounding boxes up.
    I used Tkinter library and the canvas layout to get mouse positions from images 

@@ -1,4 +1,5 @@
+WORK_LOG.txt
 .gitattributes
 labels
 *.pyc
-!.scode
+
