@@ -119,6 +119,8 @@ class segment_gui:
         self.one_frame_pixels_idx = [[],[]]
         self.bbox_list = []
         self.selectedlabel = []
+        self.add_to_temp_bbox_bag([])
+        self.label_list = []
 
     def plot_pointer_kernel(self,x,y,point_size):
 
@@ -156,29 +158,27 @@ class segment_gui:
         x_org,y_org,w,h = self._bb_tool.comp_bbox(self.pi,pf)
         x_pixels,y_pixels = imgh.generate_bbox_pixels(x_org,y_org,w,h)
 
-        xp,yp = np.array(self.pixel_idx_to_plot,dtype = int)
+        
 
         ypixels = np.concatenate((y_pixels,yp))
         xpixels = np.concatenate((x_pixels,xp))
 
-        self.add_to_pixel_bag(xpixels,ypixels)
+        
 
         self.plot_canvas(xpixels,ypixels)
-        label = self.selectedlabel
         
-        if label != []:
+        label = self.selectedlabel
+        bbox = bbox_object(x_org,y_org,w,h,label)
+        #if label != []:
 
-            bb = bbox_object(x_org,y_org,w,h,label)
-            self.bbox_list.append(bb)
-            msg = bb.str_bbox()
+        #    bbox = bbox_object(x_org,y_org,w,h,label)
+            # self.bbox_list.append(bb)
+            # msg = bb.str_bbox()
 
-            labellist = [label]
+        # self.add_to_temp_bbox_bag(bbox)
 
-            self._window["-ELEM LIST-"].update(labellist)
-            self.selectedlabel = []
+
            
-
-       
 
     def left_click_bb(self,event):
         '''
@@ -206,7 +206,26 @@ class segment_gui:
         ypixels = np.concatenate((y_pixels,yp))
         xpixels = np.concatenate((x_pixels,xp))
 
+        bbox = bbox_object(x_org,y_org,w,h,[])
+        self.add_to_temp_bbox_bag(bbox)
+
         self.plot_canvas(xpixels,ypixels)
+    
+    def reset_bbox_settings(self):
+        self.first_bb_flag = False
+        self.select_bbox = []
+        self.clear_temp_pixel_bag()
+
+    def get_pixels(self):
+        if np.array(self.pixel_idx_to_plot).size > 0:
+            xp,yp = np.array(self.pixel_idx_to_plot,dtype = int)
+            return(xp,yp)
+        else: 
+            return([],[])
+
+    def get_temp_pixels(self):
+        xp,yp = np.array(self.one_frame_pixels_idx,dtype = int)
+        return(xp[0],yp[0])
 
     def left_click_segment(self,event):
 
@@ -229,6 +248,9 @@ class segment_gui:
 
         self._window["-IMAGE-"].update(data=imgbytes)
 
+    def clear_temp_pixel_bag(self):
+        self.one_frame_pixels_idx = [[],[]]
+
     def clear_pixel_bag(self):
         self.pixel_idx_to_plot = [[],[]]
 
@@ -242,6 +264,15 @@ class segment_gui:
 
         self.one_frame_pixels_idx[0] = xidx.reshape((1,-1))
         self.one_frame_pixels_idx[1] = yidx.reshape((1,-1))
+
+    def add_to_temp_bbox_bag(self,bbox):
+        self.select_bbox = bbox
+
+    def add_to_bbox_list(self,bbox):
+        self.bbox_list.append(bbox)
+        self.label_list.append(bbox._label)
+        return(self.label_list)
+
 
     def load_kernel_value(self,value):
         
@@ -338,6 +369,28 @@ class segment_gui:
                 self._segment_tool_flag = True
                 self.canvas.unbind("<Button-1>")
                 self.canvas.bind('<B1-Motion>',self.left_click_segment)
+            
+            elif  event == "-SAVE ELEMT-":
+                
+                #bbox = bbox_object(x_org,y_org,w,h,label)
+                bbox = self.select_bbox
+
+                label = self.selectedlabel
+                if label != []:
+                    bbox._label = label
+                    self.bbox_list.append(bbox)
+                    label_list = self.add_to_bbox_list(bbox)
+                    self._window["-ELEM LIST-"].update(label_list)
+                    
+                    xp,yp = self.get_temp_pixels()
+                    self.add_to_pixel_bag(xp,yp)
+                    self.reset_bbox_settings()
+            
+            elif  event == "-DEL ELEMT-":
+
+                self.reset_bbox_settings()
+                xp,yp = self.get_pixels()
+                self.plot_canvas(xp,yp)
                 
         self._window.close()
 
@@ -364,6 +417,10 @@ file_list_column = [
     [
         sg.Listbox(values=[], enable_events=True, size=(20, 10), key="-FILE LIST-"
         )
+    ],
+    [
+        sg.Button('SAVE Elemt',enable_events=True, key="-SAVE ELEMT-"),
+        sg.Button('DEL',enable_events=True, key="-DEL ELEMT-")
     ],
     [
         sg.Text("Elemtents")
