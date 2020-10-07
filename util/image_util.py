@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 
 
 class image_handler:
@@ -15,9 +16,11 @@ class image_handler:
         self._label_list.append(labelname)
         return(self._label_list)
 
-    def load_img_list(self,imglist):
-        self._imglist = imglist
-        return(len(imglist))
+    def load_img_list(self,img_list,folder):
+        self._file_list = img_list
+        self._imglist = [os.path.join(folder, f) for f in self._file_list]
+       
+        return(len(self._imglist))
 
     def get_img_list(self):
         return(self._imglist)
@@ -78,6 +81,11 @@ class image_handler:
         imgbytes = conv_to_bytes(img)
         return(imgbytes)
 
+    def get_curr_file_name(self):
+        return(self._file_list[self._imgitr].split('.')[0])
+        #names = file_path.split()
+        #names
+
 def conv_to_bytes(img):
 
     return(cv2.imencode(".png", img)[1].tobytes())
@@ -104,6 +112,8 @@ def get_kernel(size):
     y = np.array(kernel[:,:,1].flat)
 
     return(x,y)
+
+
 
 def generate_bbox_pixels(x,y,w,h):
 

@@ -39,7 +39,7 @@ class bbox_object:
         self._w = w
         self._h = h
     
-    def str_bbox(self):
+    def conv_to_str(self):
 
         str_bb = self._label + " " + str(self._x) + " " +  str(self._y) + " " + str(self._y) + " " + str(self._h) + " " + str(self._w)
         return(str_bb)
@@ -100,7 +100,7 @@ class bounding_box:
         self.label = label
     
 class segment_gui:
-    def __init__(self,window,img_hight,img_width,img_down_scale):
+    def __init__(self,window,img_hight,img_width,img_down_scale,destin_path):
         self._window = window
         self._image_handler = imgh.image_handler(img_hight,img_width,img_down_scale)
 
@@ -113,7 +113,6 @@ class segment_gui:
         self.canvas = canvas_elem.Widget
         
         self.canvas.bind('<B1-Motion>',self.left_click_bb)
-        self.canvas.bind('<Button-3>',self.right_click_bb)
         self._kernel_value = 2
         self.pixel_idx_to_plot = [[],[]] 
         self.one_frame_pixels_idx = [[],[]]
@@ -122,64 +121,43 @@ class segment_gui:
         self.add_to_temp_bbox_bag([])
         self.label_list = []
 
-    def plot_pointer_kernel(self,x,y,point_size):
+        root = os.getcwd()
+        self.segment_path = os.path.join(root,destin_path,'segment_labels')
+        self.bb_path = os.path.join(root,destin_path,'bbox_labels')
+        try:
+            os.makedirs(self.segment_path)
+        except OSError:
+            print ("Creation of the directory %s failed" % self.segment_path)
+        else:
+            print ("Successfully created the directory %s " % self.segment_path)
 
-        img = self._image_handler.get_curr_img()
+        try:
+            os.makedirs(self.bb_path)
+        except OSError:
+            print ("Creation of the directory %s failed" % self.bb_path)
+        else:
+            print ("Successfully created the directory %s " % self.bb_path)
+
+
+    def pointer_pixels(self,x,y,point_size):
+
+        #img = self._image_handler.get_curr_img()
 
         kernel_x,kernel_y = imgh.get_kernel(point_size)
 
         kernel_x_idx = kernel_x + x
         kernel_y_idx = kernel_y + y
-       
-        img[ kernel_y_idx,kernel_x_idx, 0] = 255
-        img[ kernel_y_idx,kernel_x_idx, 1] = 0
-        img[ kernel_y_idx,kernel_x_idx, 2] = 0
+        return(kernel_x_idx,kernel_y_idx)
+        #img[ kernel_y_idx,kernel_x_idx, 0] = 255
+        #img[ kernel_y_idx,kernel_x_idx, 1] = 0
+        #img[ kernel_y_idx,kernel_x_idx, 2] = 0
  
-        imgbytes = imgh.conv_to_bytes(img)
+        #imgbytes = imgh.conv_to_bytes(img)
 
-        self._window["-IMAGE-"].update(data=imgbytes)
+        #self._window["-IMAGE-"].update(data=imgbytes)
 
-    def right_click_bb(self,event):
-        '''
-        Define last bounding box corner
-
-        '''
-        x,y = event.x,event.y
-
-        if self.first_bb_flag == True:
-            self.first_bb_flag = False
-            self._bb_tool.set_last_corner(x,y)
-            pf = (x,y)
-            
-        else:
-            return
 
         
-        x_org,y_org,w,h = self._bb_tool.comp_bbox(self.pi,pf)
-        x_pixels,y_pixels = imgh.generate_bbox_pixels(x_org,y_org,w,h)
-
-        
-
-        ypixels = np.concatenate((y_pixels,yp))
-        xpixels = np.concatenate((x_pixels,xp))
-
-        
-
-        self.plot_canvas(xpixels,ypixels)
-        
-        label = self.selectedlabel
-        bbox = bbox_object(x_org,y_org,w,h,label)
-        #if label != []:
-
-        #    bbox = bbox_object(x_org,y_org,w,h,label)
-            # self.bbox_list.append(bb)
-            # msg = bb.str_bbox()
-
-        # self.add_to_temp_bbox_bag(bbox)
-
-
-           
-
     def left_click_bb(self,event):
         '''
         Define first bounding box corner
@@ -234,7 +212,11 @@ class segment_gui:
         kernel_size = int(self._window["-SLIDER-"].TKScale.get())
         self.load_kernel_value(kernel_size)
 
-        self.plot_canvas(xpixels,ypixels)
+        x_pixels,y_pixels = self.pointer_pixels(x,y,kernel_size)
+        self.add_pixels_to_temp_bag(x_pixels,y_pixels)
+        
+        # self.plot_pointer_kernel(x,y,kernel_size)
+        self.plot_canvas(x_pixels,y_pixels)
 
     def plot_canvas(self,xp,yp):
 
@@ -272,11 +254,27 @@ class segment_gui:
         self.bbox_list.append(bbox)
         self.label_list.append(bbox._label)
         return(self.label_list)
+    
+    def get_bbox_list(self):
+        return(self.bbox_list)
+
+    def save_bbox(self):
+        file_name = self._image_handler.get_curr_file_name()
+        file_path = os.path.join(self.bb_path,file_name+ '.txt')
+
+        f = open(file_path,'w')
+        bbox_list = self.get_bbox_list()
+        for bbox in bbox_list:
+            f.write(bbox.conv_to_str())
+        f.close()
+
+
 
 
     def load_kernel_value(self,value):
         
         self._kernel_value = value
+
 
     def on_move(self,event):
     
@@ -309,12 +307,12 @@ class segment_gui:
                     file_list = []
 
                 imagelist = [
-                    os.path.join(folder, f)
+                    f
                     for f in file_list
                     if os.path.isfile(os.path.join(folder, f))
                 ]
 
-                self._image_handler.load_img_list(imagelist)
+                self._image_handler.load_img_list(imagelist,folder)
 
                 imgbytes = self._image_handler.get_next_img()
 
@@ -372,13 +370,13 @@ class segment_gui:
             
             elif  event == "-SAVE ELEMT-":
                 
-                #bbox = bbox_object(x_org,y_org,w,h,label)
                 bbox = self.select_bbox
 
                 label = self.selectedlabel
+
                 if label != []:
                     bbox._label = label
-                    self.bbox_list.append(bbox)
+                    #self.bbox_list.append(bbox)
                     label_list = self.add_to_bbox_list(bbox)
                     self._window["-ELEM LIST-"].update(label_list)
                     
@@ -391,6 +389,11 @@ class segment_gui:
                 self.reset_bbox_settings()
                 xp,yp = self.get_pixels()
                 self.plot_canvas(xp,yp)
+            
+            elif event == "-SAVE-":
+                
+                self.save_bbox()
+                # print(file_name)
                 
         self._window.close()
 
@@ -466,7 +469,8 @@ if __name__ == "__main__":
     gui = segment_gui(  window,
                         IMG_HIGH,
                         IMG_WIDTH,
-                        IMG_DOWN_SCALE_PERCENT
+                        IMG_DOWN_SCALE_PERCENT,
+                        'labels'
                         )
 
     gui.loop()
