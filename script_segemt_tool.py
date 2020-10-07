@@ -268,9 +268,6 @@ class segment_gui:
             f.write(bbox.conv_to_str() + '\n')
         f.close()
 
-
-
-
     def load_kernel_value(self,value):
         
         self._kernel_value = value
