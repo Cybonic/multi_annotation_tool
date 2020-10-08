@@ -227,8 +227,6 @@ class segment_gui:
         xp,yp = np.array(self.pixel_idx_to_plot,dtype = int)
         return(xp,yp)
 
-    
-
     def plot_canvas(self,xp,yp):
 
         img = self._image_handler.get_curr_img()
@@ -252,7 +250,6 @@ class segment_gui:
     def clear_pixel_bag(self):
         self.pixel_idx_to_plot = [[],[]]
 
-
     def add_to_pixel_bag(self,xidx,yidx):
 
         self.pixel_idx_to_plot[0] = np.concatenate((self.pixel_idx_to_plot[0],xidx))
@@ -263,8 +260,6 @@ class segment_gui:
         self.one_frame_pixels_idx[0] = np.concatenate((self.one_frame_pixels_idx[0],xidx))
         self.one_frame_pixels_idx[1] = np.concatenate((self.one_frame_pixels_idx[1],yidx))
 
-        #self.one_frame_pixels_idx[0] = xidx.reshape((1,-1))
-        #self.one_frame_pixels_idx[1] = yidx.reshape((1,-1))
     def get_temp_bbox_bag(self):
         return(self.select_bbox)
 
