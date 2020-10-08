@@ -1,10 +1,6 @@
 # img_viewer.py
 '''
 
-
-
-
-
 '''
 import PySimpleGUI as sg
 import os.path
@@ -31,6 +27,19 @@ IMG_WIDTH = 720
 
 IMG_DOWN_SCALE_PERCENT = 40
 
+class segment_obj:
+    def __init__(self,label,xpixels,ypixels):
+        self._label = label
+        self._xpixel = xpixels
+        self._ypixel = ypixels
+    
+    def conv_to_str(self):
+
+        x_str = ' '.join([str(v) for v in self._xpixel])
+        y_str = ' '.join([str(v) for v in self._ypixel])
+
+        str_segm = self._label + ':'
+        
 class bbox_object:
     def __init__(self,x,y,w,h,label):
         self._x = x
@@ -141,21 +150,11 @@ class segment_gui:
 
     def pointer_pixels(self,x,y,point_size):
 
-        #img = self._image_handler.get_curr_img()
-
         kernel_x,kernel_y = imgh.get_kernel(point_size)
 
         kernel_x_idx = kernel_x + x
         kernel_y_idx = kernel_y + y
         return(kernel_x_idx,kernel_y_idx)
-        #img[ kernel_y_idx,kernel_x_idx, 0] = 255
-        #img[ kernel_y_idx,kernel_x_idx, 1] = 0
-        #img[ kernel_y_idx,kernel_x_idx, 2] = 0
- 
-        #imgbytes = imgh.conv_to_bytes(img)
-
-        #self._window["-IMAGE-"].update(data=imgbytes)
-
 
         
     def left_click_bb(self,event):
@@ -190,8 +189,9 @@ class segment_gui:
         self.plot_canvas(xpixels,ypixels)
     
     def reset_bbox_settings(self):
-        self.first_bb_flag = False
-        self.select_bbox = []
+        
+        self.bbox_list = []
+        self.label_list = []
         self.clear_temp_pixel_bag()
 
     def get_pixels(self):
@@ -232,6 +232,7 @@ class segment_gui:
 
     def clear_temp_pixel_bag(self):
         self.one_frame_pixels_idx = [[],[]]
+        self.first_bb_flag = False
 
     def clear_pixel_bag(self):
         self.pixel_idx_to_plot = [[],[]]
@@ -255,10 +256,22 @@ class segment_gui:
         self.label_list.append(bbox._label)
         return(self.label_list)
     
+    def del_bbox(self):
+        self.clear_pixel_bag()
+        self.reset_bbox_settings()
+
     def get_bbox_list(self):
         return(self.bbox_list)
+    
+    def save_bbox(self,bbox):
 
-    def save_bbox(self):
+        label_list = self.add_to_bbox_list(bbox)
+        xp,yp = self.get_temp_pixels()
+        self.add_to_pixel_bag(xp,yp)
+        self.clear_temp_pixel_bag()
+        return(label_list)
+
+    def save_bbox_to_file(self):
         file_name = self._image_handler.get_curr_file_name()
         file_path = os.path.join(self.bb_path,file_name+ '.txt')
 
@@ -338,6 +351,9 @@ class segment_gui:
             elif event == "-NEXT-":
                 # NEXT button was pressed: show next image
                 self.clear_pixel_bag()
+                self.reset_bbox_settings()
+                self._window["-ELEM LIST-"].update([])
+
                 imgbytes = self._image_handler.get_next_img() # Get next image (as byte format) in line 
                 self._window["-IMAGE-"].update(data=imgbytes) # Upload image to GUI
             
@@ -367,30 +383,28 @@ class segment_gui:
             
             elif  event == "-SAVE ELEMT-":
                 
-                bbox = self.select_bbox
-
                 label = self.selectedlabel
 
                 if label != []:
+                    bbox = self.select_bbox
                     bbox._label = label
-                    #self.bbox_list.append(bbox)
-                    label_list = self.add_to_bbox_list(bbox)
+                    label_list = self.save_bbox(bbox)
                     self._window["-ELEM LIST-"].update(label_list)
-                    
-                    xp,yp = self.get_temp_pixels()
-                    self.add_to_pixel_bag(xp,yp)
-                    self.reset_bbox_settings()
-            
+
             elif  event == "-DEL ELEMT-":
 
-                self.reset_bbox_settings()
+                self.clear_temp_pixel_bag()
                 xp,yp = self.get_pixels()
                 self.plot_canvas(xp,yp)
             
+            elif event == "-DEL-":
+                self.del_bbox()
+                self._window["-ELEM LIST-"].update([])
+                xp,yp = self.get_pixels()
+                self.plot_canvas(xp,yp)
+
             elif event == "-SAVE-":
-                
-                self.save_bbox()
-                # print(file_name)
+                self.save_bbox_to_file()
                 
         self._window.close()
 
@@ -406,8 +420,6 @@ file_list_column = [
     [
         sg.Text("Kernel"),
         sg.Slider(range=(0,50),default_value=2,size=(12,20),orientation='horizontal',font=('Helvetica', 10),key='-SLIDER-'),
-        #sg.In(size=(9, 1), enable_events=True, key="-KERNEL-"),
-        #sg.Button('Ok',enable_events=True, key="-KERNELOK-"),
     ],
     [
         sg.Text("Label"),
@@ -415,12 +427,11 @@ file_list_column = [
         sg.Button('Ok',enable_events=True, key="-OK-"),
     ],
     [
-        sg.Listbox(values=[], enable_events=True, size=(20, 10), key="-FILE LIST-"
-        )
+        sg.Listbox(values=[], enable_events=True, size=(20, 10), key="-FILE LIST-")
     ],
     [
-        sg.Button('SAVE Elemt',enable_events=True, key="-SAVE ELEMT-"),
-        sg.Button('DEL',enable_events=True, key="-DEL ELEMT-")
+        sg.Button('SAVE ELEMT',enable_events=True, key="-SAVE ELEMT-"),
+        sg.Button('DEL ELEMT',enable_events=True, key="-DEL ELEMT-")
     ],
     [
         sg.Text("Elemtents")
@@ -441,8 +452,8 @@ image_viewer_column = [
     [sg.Text("Choose an image from list on left:")],
     [sg.Text(size=(40, 1), key="-TOUT-")],
     [sg.Image(size=(720, 480),key="-IMAGE-")],
-    [sg.Button('NEXT',enable_events=True, key="-NEXT-"),
-     sg.Button('PREV',enable_events=True, key="-PREV-"),
+    [sg.Button('PREV',enable_events=True, key="-PREV-"),
+     sg.Button('NEXT',enable_events=True, key="-NEXT-"),
      sg.Button('Zoom In',enable_events=True, key="-ZOOMIN-"),
      sg.Button('Zoom Out',enable_events=True, key="-ZOOMOUT-")],
 ]
