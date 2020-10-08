@@ -39,7 +39,7 @@ class segment_obj:
         y_str = ' '.join([str(v) for v in self._ypixel])
 
         str_segm = self._label + ':'
-        
+
 class bbox_object:
     def __init__(self,x,y,w,h,label):
         self._x = x
@@ -53,10 +53,6 @@ class bbox_object:
         str_bb = self._label + " " + str(self._x) + " " +  str(self._y) + " " + str(self._y) + " " + str(self._h) + " " + str(self._w)
         return(str_bb)
                   
-                  
-                  
-                  
-
 
 class bounding_box:
     def __init__(self):
@@ -133,6 +129,7 @@ class segment_gui:
         root = os.getcwd()
         self.segment_path = os.path.join(root,destin_path,'segment_labels')
         self.bb_path = os.path.join(root,destin_path,'bbox_labels')
+
         try:
             os.makedirs(self.segment_path)
         except OSError:
@@ -168,31 +165,52 @@ class segment_gui:
             self.first_bb_flag = True
             self._bb_tool.set_first_corner(x,y)
             self.pi = (x,y)
-            self.plot_pointer_kernel(x,y,2)
+            #self.plot_pointer_kernel(x,y,2)
             return
 
+        # Final corner
         pf = (x,y)
-
+        # compute bounding box
         x_org,y_org,w,h = self._bb_tool.comp_bbox(self.pi,pf)
+        bbox = bbox_object(x_org,y_org,w,h,[])
+        # Add to temporary list
+        self.add_to_temp_bbox_bag(bbox)
+        # Compute bounding box pixels 
         x_pixels,y_pixels = imgh.generate_bbox_pixels(x_org,y_org,w,h)
-        
+        # Clear the previous boudning box pixels from the temp bag
+        self.clear_temp_pixel_bag()
+        # Add the new pixels to temp bag
         self.add_pixels_to_temp_bag(x_pixels,y_pixels)
-
-        xp,yp = np.array(self.pixel_idx_to_plot,dtype = int)
-
+        # Get all bounding box pixels from the current frame
+        xp,yp = self.get_frame_pixels()
+        # Merge all pixels for plotting
         ypixels = np.concatenate((y_pixels,yp))
         xpixels = np.concatenate((x_pixels,xp))
-
-        bbox = bbox_object(x_org,y_org,w,h,[])
-        self.add_to_temp_bbox_bag(bbox)
-
+        # refresh frame       
         self.plot_canvas(xpixels,ypixels)
     
+    def left_click_segment(self,event):
+
+        x,y = event.x,event.y
+        self.right_click_pose = (event.x,event.y)
+
+        kernel_size = int(self._window["-SLIDER-"].TKScale.get())
+
+        self.load_kernel_value(kernel_size)
+
+        x_pixels,y_pixels = self.pointer_pixels(x,y,kernel_size)
+
+        self.add_pixels_to_temp_bag(x_pixels,y_pixels)
+        
+        x_pixels,y_pixels = self.get_temp_pixels()
+        self.plot_canvas(x_pixels,y_pixels)
+    
+
     def reset_bbox_settings(self):
         
         self.bbox_list = []
         self.label_list = []
-        self.clear_temp_pixel_bag()
+        self.reset_temp()
 
     def get_pixels(self):
         if np.array(self.pixel_idx_to_plot).size > 0:
@@ -203,20 +221,13 @@ class segment_gui:
 
     def get_temp_pixels(self):
         xp,yp = np.array(self.one_frame_pixels_idx,dtype = int)
-        return(xp[0],yp[0])
+        return(xp,yp)
+    
+    def get_frame_pixels(self):
+        xp,yp = np.array(self.pixel_idx_to_plot,dtype = int)
+        return(xp,yp)
 
-    def left_click_segment(self,event):
-
-        x,y = event.x,event.y
-        self.right_click_pose = (event.x,event.y)
-        kernel_size = int(self._window["-SLIDER-"].TKScale.get())
-        self.load_kernel_value(kernel_size)
-
-        x_pixels,y_pixels = self.pointer_pixels(x,y,kernel_size)
-        self.add_pixels_to_temp_bag(x_pixels,y_pixels)
-        
-        # self.plot_pointer_kernel(x,y,kernel_size)
-        self.plot_canvas(x_pixels,y_pixels)
+    
 
     def plot_canvas(self,xp,yp):
 
@@ -232,6 +243,10 @@ class segment_gui:
 
     def clear_temp_pixel_bag(self):
         self.one_frame_pixels_idx = [[],[]]
+        
+    def reset_temp(self):
+        self.clear_temp_pixel_bag()
+        self.clear_temp_bbox_bag()
         self.first_bb_flag = False
 
     def clear_pixel_bag(self):
@@ -245,8 +260,16 @@ class segment_gui:
 
     def add_pixels_to_temp_bag(self,xidx,yidx):
 
-        self.one_frame_pixels_idx[0] = xidx.reshape((1,-1))
-        self.one_frame_pixels_idx[1] = yidx.reshape((1,-1))
+        self.one_frame_pixels_idx[0] = np.concatenate((self.one_frame_pixels_idx[0],xidx))
+        self.one_frame_pixels_idx[1] = np.concatenate((self.one_frame_pixels_idx[1],yidx))
+
+        #self.one_frame_pixels_idx[0] = xidx.reshape((1,-1))
+        #self.one_frame_pixels_idx[1] = yidx.reshape((1,-1))
+    def get_temp_bbox_bag(self):
+        return(self.select_bbox)
+
+    def clear_temp_bbox_bag(self):
+        self.select_bbox = []
 
     def add_to_temp_bbox_bag(self,bbox):
         self.select_bbox = bbox
@@ -259,16 +282,20 @@ class segment_gui:
     def del_bbox(self):
         self.clear_pixel_bag()
         self.reset_bbox_settings()
+    
 
     def get_bbox_list(self):
         return(self.bbox_list)
     
     def save_bbox(self,bbox):
 
+        # Add the current bounding box to permanent list
         label_list = self.add_to_bbox_list(bbox)
+        # Get the current bbox pixels 
         xp,yp = self.get_temp_pixels()
+        # Update frame pixels with the new bbox pixels 
         self.add_to_pixel_bag(xp,yp)
-        self.clear_temp_pixel_bag()
+
         return(label_list)
 
     def save_bbox_to_file(self):
@@ -284,7 +311,6 @@ class segment_gui:
     def load_kernel_value(self,value):
         
         self._kernel_value = value
-
 
     def on_move(self,event):
     
@@ -370,30 +396,30 @@ class segment_gui:
                 self._segment_tool_flag = False
                 
                 self.canvas.bind('<B1-Motion>',self.left_click_bb)
-                #self.canvas.bind('<Button-3>',self.right_click_bb)
-                # self.canvas.unbind('<B1-Motion>')
 
             elif event == "-RADIO2-":
             # Selection of segmentation tool
                 self._window["-RADIO1-"].update(False)
                 self._bbox_tool_flag = False
                 self._segment_tool_flag = True
-                self.canvas.unbind("<Button-1>")
+                #self.canvas.unbind("<Button-1>")
                 self.canvas.bind('<B1-Motion>',self.left_click_segment)
             
             elif  event == "-SAVE ELEMT-":
                 
+                temp_bag = self.get_temp_bbox_bag()
                 label = self.selectedlabel
 
-                if label != []:
+                if label != [] and temp_bag != []:
                     bbox = self.select_bbox
                     bbox._label = label
                     label_list = self.save_bbox(bbox)
+                    self.reset_temp()
                     self._window["-ELEM LIST-"].update(label_list)
 
             elif  event == "-DEL ELEMT-":
 
-                self.clear_temp_pixel_bag()
+                self.reset_temp()
                 xp,yp = self.get_pixels()
                 self.plot_canvas(xp,yp)
             
