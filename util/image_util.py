@@ -47,6 +47,10 @@ class image_handler:
             are computed and the smallest is used for downscaling.
 
         '''
+        if self._imglist == []: 
+            print("WARNING: No paths to images found")
+            return(np.array([]))
+
         imgfile = self._imglist[itr]
         img = cv2.imread(imgfile)
 
