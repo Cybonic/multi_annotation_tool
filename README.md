@@ -1,5 +1,5 @@
 # multi_annotation_tool
- image segementation and bounding boxes annotation
+ image segementation and bounding box annotation
 
 # Install requirements
 pip3 install -r requirements.txt
