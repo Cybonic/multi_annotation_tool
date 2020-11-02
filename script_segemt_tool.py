@@ -495,7 +495,7 @@ file_list_column = [
         sg.Radio('Bounding Box', "radio" ,key = "-RADIO1-",enable_events=True,default=True)
     ],
     [
-     sg.Radio('Segmentation',"radio",key = "-RADIO2-",enable_events=True)
+        sg.Radio('Segmentation',"radio",key = "-RADIO2-",enable_events=True)
     ],
     [
         sg.Text("Kernel"),
@@ -528,7 +528,7 @@ file_list_column = [
 
 # For now will only show the name of the file that was chosen
 image_viewer_column = [
-    [sg.FolderBrowse(),sg.In(size=(40, 1), enable_events=True, key="-FOLDER-")],
+    [sg.FolderBrowse('Source'), sg.In(size=(40, 1), enable_events=True, key="-FOLDER-")],
     [sg.Text("Choose an image from list on left:")],
     [sg.Text(size=(40, 1), key="-TOUT-")],
     [sg.Image(size=(720, 480),key="-IMAGE-")],
