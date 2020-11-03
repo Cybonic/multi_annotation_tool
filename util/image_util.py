@@ -11,7 +11,14 @@ class image_handler:
         self._hight = taget_hight
         self._width = target_with
         self._label_list = []
-        
+        self.dim = []
+    
+    def get_im_dim(self):
+        '''
+        return(width, height)
+        '''
+        return(self.dim)
+
     def appendLabel(self,labelname):
         self._label_list.append(labelname)
         return(self._label_list)
@@ -30,10 +37,10 @@ class image_handler:
         width = int(img.shape[1] * scalepercent / 100)
         height = int(img.shape[0] * scalepercent / 100)
 
-        dim = (width, height)
+        self.dim = (width, height)
         
         # resize image
-        resized = cv2.resize(img, dim, interpolation = cv2.INTER_AREA)
+        resized = cv2.resize(img, self.dim , interpolation = cv2.INTER_AREA)
         return(resized)
     
     def get_img(self,itr):
@@ -66,8 +73,11 @@ class image_handler:
         resized_img = self.img_down_scale(img,percent)
         #imgbytes = cv2.imencode(".png", resized)[1].tobytes()
         
-        self.image_t = resized_img
+        self.image_t = resized_img.copy()
         return(resized_img)
+
+    def get_resized_img(self):
+        return(self.image_t)
 
     def get_curr_img(self):
         img = self.get_img(self._imgitr)
@@ -89,6 +99,10 @@ class image_handler:
         return(self._file_list[self._imgitr].split('.')[0])
         #names = file_path.split()
         #names
+    
+def write_to_file(img,file):
+    cv2.imwrite(file,img)
+
 
 def conv_to_bytes(img):
 
@@ -150,3 +164,4 @@ def generate_bbox_pixels(x,y,w,h):
     # h_range = np.array(range(0,h))
 
     # vertical = x +
+

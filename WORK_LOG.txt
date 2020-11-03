@@ -1,14 +1,17 @@
 TO-DO: 
-[] unique labels are cleared when tool is changed or next bottom is pressed. This obligates that each times
+[x] unique labels are cleared when tool is changed or next bottom is pressed. This obligates that each times
 the labels have to be re-entered again. Unchange this!!!
-[] semantic labels should be in image format. Lookup what format is the kitti version. 
+[x] semantic labels should be in image format. Look-up what format is the kitti version. 
 Caution, the original image is down scaled, so be aware that either the image is re-saved in the new scale 
 or the semantic image is up-scaled to the scale of the original image. 
 [] Creation os a source and a destination browser bottom to automate the saving precess
-[] 
+
 
 
 LOG:
+03/11/2020: Changed the segment file to segmentation image. Files are created at the parent 
+folder of the origin image. 
+
 09/10/2020  Today I finished the first complete version: bounding box and segmentation. 
 Both features are able to save the selected elements to a file.
 

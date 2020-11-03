@@ -18,7 +18,9 @@ from matplotlib.figure import Figure
 from PIL import Image, ImageTk
 
 from util import image_util as imgh
-import util 
+import util.segment_util as seg_util 
+import util
+import util.util_tools as utils
 
 fig = Figure()
 
@@ -34,6 +36,12 @@ class segment_obj:
         self._xpixel = xpixels
         self._ypixel = ypixels
     
+    def get_idx(self):
+        return(self._xpixel, self._ypixel)
+
+    def get_label(self):
+        return(self._label)
+
     def conv_to_str(self):
 
         x_str = ' '.join([str(v) for v in self._xpixel])
@@ -131,25 +139,24 @@ class segment_gui:
         self.mode = self.set_mode('bbox')
         self.unqlabel_list = []
         
-        self.label_list_file = "gtlabels.yaml"
-        self.root = os.getcwd()
-        self.segment_path = os.path.join(self.root,destin_path,'segment_labels')
-        self.bb_path = os.path.join(self.root,destin_path,'bbox_labels')
+        self.label_list_file = "riva_classes.yaml"
+        root = os.getcwd()
 
-        try:
-            os.makedirs(self.segment_path)
-        except OSError:
-            print ("Creation of the directory %s failed" % self.segment_path)
-        else:
-            print ("Successfully created the directory %s " % self.segment_path)
+        self.define_paths(root)
 
-        try:
-            os.makedirs(self.bb_path)
-        except OSError:
-            print ("Creation of the directory %s failed" % self.bb_path)
-        else:
-            print ("Successfully created the directory %s " % self.bb_path)
 
+    def define_paths(self,root_path):
+        
+        self.root = root_path
+        self.segment_path = os.path.join(root_path,'segment_labels')
+        self.bb_path = os.path.join(root_path,'bbox_labels')
+        self.resized_path = os.path.join(root_path,'image')
+
+        utils.create_folder(self.segment_path)
+        utils.create_folder(self.bb_path)
+        utils.create_folder(self.resized_path)
+
+            
     def get_mode(self):
         return(self.mode)
 
@@ -164,7 +171,7 @@ class segment_gui:
         
     def plot_empty_canvas(self):
         self.plot_canvas([],[])
-        self._window["-FILE LIST-"].update([])
+        #self._window["-FILE LIST-"].update([])
         self._window["-ELEM LIST-"].update([])
 
     def pointer_pixels(self,x,y,point_size):
@@ -275,7 +282,7 @@ class segment_gui:
     def clear_all(self):
         self.clear_elem()
         self.clear_temp()
-        self.unqlabel_list = []
+        #self.unqlabel_list = []
 
     def add_to_pixel_bag(self,xidx,yidx):
 
@@ -292,8 +299,14 @@ class segment_gui:
 
     def add_to_elem_list(self,bbox):
         self.elem_list.append(bbox)
-        self.label_list.append(bbox._label)
+        # print(self.unqlabel_list.index(bbox._label))
+        # self.label_list.append(self.unqlabel_list[self.unqlabel_list.index(bbox._label)])
         return(self.label_list)
+
+    def add_label_to_uniq_bag(self,label):
+        list_length = len(self.unqlabel_list)
+        self.unqlabel_list[label] = list_length + 1 
+        return(list(self.unqlabel_list.keys()))
 
     def get_temp_obj_bag(self):
         return(self.temp_obj_list)
@@ -316,50 +329,98 @@ class segment_gui:
     def save_temp_to_elem(self,obj):
 
         # Add the current bounding box to permanent list
-        label_list = self.add_to_elem_list(obj)
+        self.add_to_elem_list(obj)
         # Get the current bbox pixels 
         xp,yp = self.get_temp_pixels()
         # Update frame pixels with the new bbox pixels 
         self.add_to_pixel_bag(xp,yp)
 
-        return(label_list)
+        # return(label_list)
 
-    def save_elem_to_file(self,path,filename):
+    def save_elem_to_file(self):
         
+        
+        if self.mode == 'bbox':
+            path = self.bb_path
+        elif(self.mode == 'segment'): 
+            path = self.segment_path
+
         if os.path.exists(path) == False:
             print("[ERROR] File does not exist")
             return()
         
-        file_path = os.path.join(path,filename)
+        file_name = self._image_handler.get_curr_file_name()
 
-        f = open(file_path,'w')
+        file_path = os.path.join(path,file_name)
+
         elem_list = self.get_elem_list()
-        for elem in elem_list:
-            f.write(elem.conv_to_str() + '\n')
-        f.close()
+        
+        if self.mode == 'segment':
+            # Convert element list to single image
+            # load image characteristics 
+            width, height = self._image_handler.get_im_dim()
+            # segm_imge = imgh.create_img_tamplate(height,width,1)
+            segment_img = seg_util.convert_segm_objs_to_img(height,width,elem_list)
+            seg_img_file_name = file_path + '.png'
+            cv2.imwrite( seg_img_file_name , segment_img)
+        
+        else:
+
+            box_file_name = file_path + '.txt'
+            f = open(box_file_name ,'w')
+            for elem in elem_list:
+                f.write(elem.conv_to_str() + '\n')
+            f.close()
 
     def save_labels_to_file(self,labels):
         '''
-        Save labels to a yaml file
+        Save labels and indexes to a yaml file
 
         '''
+        # Get file and root paths
         filename = self.label_list_file
         path = self.root
-
+        # Build final file path
         file_path = os.path.join(path,filename)
-
+        # Open file handler
         f = open(file_path,'w')
-        #doc = yaml.load(f, Loader=yaml.FullLoader)
-
-        range_idx_list = list(range(0,len(labels)))
-        doc = dict(zip(labels,range_idx_list))
-        # for i,(elem) in enumerate(labels):
-            
-            # f.write(elem.conv_to_str() + '\n')
-
+        # Convertion  of the labels to yaml format 
+        doc = {"labels":labels}
+        # Save the labels to yaml file
         yaml.dump(doc, f)
         f.close()
 
+    def read_labels_from_file(self,file_path):
+        '''
+        
+        Read ground truth labels from yaml file
+        If no file exists, an empty list is returned
+        
+        Input:
+         - file_path: file path to read labels from
+
+        Output:
+         - list of ground truth labels
+
+        '''
+        try: 
+        # Open file handler 
+            f = open(file_path,'r')
+            dict_label_list = yaml.load(f, Loader=yaml.FullLoader)
+            label_list = dict_label_list['labels']
+        except:
+            print("[WARN] Label file does not exist!")
+            print("[INFO] Labels will be initialized empty!")
+            label_list = dict([])
+        
+        return(label_list)
+
+    def load_unqlabels(self,labels):
+        self.unqlabel_list = labels
+
+    def load_root_path(self,path):
+        self.root = path
+        
     def load_kernel_value(self,value):
         
         self._kernel_value = value
@@ -369,10 +430,24 @@ class segment_gui:
         print('Pointer moved to {0}'.format(
             (event.x, event.y)))
 
-    def click_event(self,event, x, y, flags, param):
-        if event == cv2.EVENT_MOUSEMOVE and event == cv2.EVENT_LBUTTONDOWN:
-            print(x,",",y)
-        
+    
+    def save_img(self):
+        '''
+        Save the resized image 
+
+        save_img()
+
+        '''
+        # Get the resized image
+        img = self._image_handler.get_resized_img()
+        # Get all the name 
+        file_name = self._image_handler.get_curr_file_name()
+        # Build the full name 
+        file_path = os.path.join(self.resized_path ,file_name + '.png')
+        # Write the resize image to a file
+        imgh.write_to_file(img,file_path)
+
+
     def loop(self):
         
         while True:
@@ -387,6 +462,24 @@ class segment_gui:
             if event == "-FOLDER-":
 
                 folder = values["-FOLDER-"]
+
+                # Get root path
+                parent_folder = os.path.dirname(folder)  
+                print("[INFO] Root image path: " + parent_folder)
+                # Load root path
+
+                self.define_paths(parent_folder)
+                
+                label_yaml_file = os.path.join(parent_folder,self.label_list_file)
+
+                uniq_label_list = self.read_labels_from_file(label_yaml_file)
+                self.load_unqlabels(uniq_label_list)
+                label_plot = list(uniq_label_list.keys())
+
+                try:
+                    self._window["-FILE LIST-"].update(label_plot)
+                except:
+                    pass
 
                 try:
                     # Get list of files in folder
@@ -409,10 +502,12 @@ class segment_gui:
             elif event == "-OK-":
 
                 label_name = values["-LABEL-"]
-                self.unqlabel_list.append(label_name)
+                
+                # self.unqlabel_list.append(label_name)
+                plot_label_list = self.add_label_to_uniq_bag(label_name)
                 
                 try:
-                    self._window["-FILE LIST-"].update(self.unqlabel_list)
+                    self._window["-FILE LIST-"].update(plot_label_list)
                 except:
                     pass
 
@@ -470,17 +565,26 @@ class segment_gui:
                 #print("[DEBUG] I'm SAVE obj")
                 temp_bag = self.get_temp_obj_bag()
                 label = self.selectedlabel
+                unq_label = self.get_unqlabels()
 
                 if label != [] and temp_bag != []:
                     
                     elem = temp_bag
-                    elem._label = label
 
-                    label_list = self.save_temp_to_elem(elem)
-                    #elif self.get_mode == 'segment':
+                    if self.mode == 'bbox':
+                        elem._label = label
+                        label_str = label
+                    else:
+                        elem._label = unq_label[label]
+                        label_str = utils.get_key(self.unqlabel_list,elem._label)
+                        
+                    self.save_temp_to_elem(elem)
                         
                     self.clear_temp()
-                    self._window["-ELEM LIST-"].update(label_list)
+                    
+                    self.label_list.append(label_str)
+
+                    self._window["-ELEM LIST-"].update(self.label_list)
 
             elif  event == "-DEL OBJ-":
 
@@ -501,17 +605,9 @@ class segment_gui:
                 # Save annotation data
                 # Save unique label names 
 
-                
+                self.save_elem_to_file()
+                self.save_img()
 
-                file_name = self._image_handler.get_curr_file_name()
-                file_name += '.txt'
-                
-                if self.mode == 'bbox':
-                    path = self.bb_path
-                elif(self.mode == 'segment'): 
-                    path = self.segment_path
-
-                self.save_elem_to_file(path,file_name)
                 label_list = self.get_unqlabels()
                 self.save_labels_to_file(label_list)
                 
