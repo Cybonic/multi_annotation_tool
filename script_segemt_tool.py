@@ -4,6 +4,7 @@
 '''
 import PySimpleGUI as sg
 import os.path
+import yaml
 from PIL import Image
 import cv2
 import numpy as np
@@ -129,10 +130,11 @@ class segment_gui:
         self.label_list = []
         self.mode = self.set_mode('bbox')
         self.unqlabel_list = []
-
-        root = os.getcwd()
-        self.segment_path = os.path.join(root,destin_path,'segment_labels')
-        self.bb_path = os.path.join(root,destin_path,'bbox_labels')
+        
+        self.label_list_file = "gtlabels.yaml"
+        self.root = os.getcwd()
+        self.segment_path = os.path.join(self.root,destin_path,'segment_labels')
+        self.bb_path = os.path.join(self.root,destin_path,'bbox_labels')
 
         try:
             os.makedirs(self.segment_path)
@@ -308,6 +310,9 @@ class segment_gui:
         xp,yp = np.array(self.temp_pixel_bag,dtype = int)
         return(xp,yp)
 
+    def get_unqlabels(self):
+        return(self.unqlabel_list)
+
     def save_temp_to_elem(self,obj):
 
         # Add the current bounding box to permanent list
@@ -321,7 +326,6 @@ class segment_gui:
 
     def save_elem_to_file(self,path,filename):
         
-        
         if os.path.exists(path) == False:
             print("[ERROR] File does not exist")
             return()
@@ -332,6 +336,28 @@ class segment_gui:
         elem_list = self.get_elem_list()
         for elem in elem_list:
             f.write(elem.conv_to_str() + '\n')
+        f.close()
+
+    def save_labels_to_file(self,labels):
+        '''
+        Save labels to a yaml file
+
+        '''
+        filename = self.label_list_file
+        path = self.root
+
+        file_path = os.path.join(path,filename)
+
+        f = open(file_path,'w')
+        #doc = yaml.load(f, Loader=yaml.FullLoader)
+
+        range_idx_list = list(range(0,len(labels)))
+        doc = dict(zip(labels,range_idx_list))
+        # for i,(elem) in enumerate(labels):
+            
+            # f.write(elem.conv_to_str() + '\n')
+
+        yaml.dump(doc, f)
         f.close()
 
     def load_kernel_value(self,value):
@@ -447,15 +473,12 @@ class segment_gui:
 
                 if label != [] and temp_bag != []:
                     
-                    #if self.get_mode() == 'bbox':
-                        #print("[DEBUG] I'm SAVE obj")
                     elem = temp_bag
                     elem._label = label
 
                     label_list = self.save_temp_to_elem(elem)
                     #elif self.get_mode == 'segment':
                         
-
                     self.clear_temp()
                     self._window["-ELEM LIST-"].update(label_list)
 
@@ -475,7 +498,11 @@ class segment_gui:
                 self.plot_canvas(xp,yp)
 
             elif event == "-SAVE-":
+                # Save annotation data
+                # Save unique label names 
+
                 
+
                 file_name = self._image_handler.get_curr_file_name()
                 file_name += '.txt'
                 
@@ -485,6 +512,8 @@ class segment_gui:
                     path = self.segment_path
 
                 self.save_elem_to_file(path,file_name)
+                label_list = self.get_unqlabels()
+                self.save_labels_to_file(label_list)
                 
         self._window.close()
 
